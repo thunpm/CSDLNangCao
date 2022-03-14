@@ -129,113 +129,7 @@ VALUES
 	('MCTD16', 'DH10', 'TS12', 2, 39000)
 GO
 
--- TẠO KHUNG NHÌN HIỂN THỊ THÔNG TIN CÁC KHÁCH HÀNG TRONG BẢNG CUSTOMER CÓ ĐỊA CHỈ LÀ ĐÀ NẴNG VÀ CÓ TỔNG TIỀN LỚN HƠN 50000
-
-CREATE VIEW CHITIETKHACHHANG50 AS 
-	SELECT DBO.CUSTOMER.MaKH, DBO.CUSTOMER.TenKH, DBO.CUSTOMER.Email, DBO.ORDER_.TongTien FROM dbo.CUSTOMER 
-	INNER JOIN DBO.ORDER_ ON DBO.CUSTOMER.MaKH = DBO.ORDER_.MaKH 
-	WHERE dbo.CUSTOMER.DiaChi = 'Thanh Khe' AND DBO.ORDER_.TongTien > 50000
-
-select * from CHITIETKHACHHANG50
-
--- TẠO KHUNG NHÌN HIỂN THỊ THÔNG TIN CÁC SẢN PHẨM TRONG BẢNG PRODUCT CÓ GIASANPHAM LỚN HƠN 20000 VÀ CÓ SỐ LƯỢNG MUA LỚN HƠN 5
-
-CREATE VIEW CHITIETSANPHAM5 AS 
-	SELECT DBO.PRODUCT.TenSP, DBO.PRODUCT.MaSP, DBO.PRODUCT.GiaSP, DBO.ORDER_DETAIL.SoLuongMua FROM dbo.PRODUCT 
-	INNER JOIN DBO.ORDER_DETAIL ON DBO.PRODUCT.MaSP = DBO.ORDER_DETAIL.MaSP 
-	WHERE DBO.PRODUCT.GiaSP > 20000 AND DBO.ORDER_DETAIL.SoLuongMua > 5;
-
-select * from CHITIETSANPHAM5
-
--- Hàm trả về doanh thu của ngày hôm nay
-
-create function doanhThu() 
-returns float
-as
-	begin
-		declare @doanhThu float
-
-		select @doanhThu = case when sum(SoLuongMua * GiaSP) is null then 0 else sum(SoLuongMua * GiaSP) end from ORDER_DETAIL od
-		inner join ORDER_ o on o.MaDH = od.MaDH
-		where convert(date, NgayDatHang) = convert(date, getdate())
-
-		return @doanhThu
-	end
-
-select dbo.doanhThu() as DoanhThuNgay
-
--- Hàm trả về thông tin các khách hàng đã mua trên 5 sản phẩm
-
-create function khachHangThanThiet() 
-returns table
-as
-	return select c.* from CUSTOMER c
-	where c.MaKH in (select MaKH from ORDER_ o 
-					inner join ORDER_DETAIL od on o.MaDH = od.MaDH
-					group by MaKH
-					having sum(SoLuongMua) > 5)
-
-select * from dbo.khachHangThanThiet()
-
--- Hàm đếm tổng số lượng đã bán được của một sản phẩm nào đó
-
-create function tongSanPhamBan(@maSP varchar(10))
-returns int
-as
-	begin
-		declare @tongSP int
-
-		select @tongSP = sum(SoLuongMua) from ORDER_DETAIL
-		where MaSP = @maSP
-
-		return @tongSP
-	end
-
-select dbo.tongSanPhamBan('TS01') as DaBan
-
--- Thủ tục bổ sung thêm bản ghi mới vào bảng ORDER_DETAIL với nguyên tắc là không được trùng khóa chính 
--- và đảm bảo toàn vẹn dữ liệu tham chiếu đến các bảng có liên quan. 
-
-create proc insertOrderDetail (@MaCTDH CHAR(10),
-								@MaDH CHAR(10),
-								@MaSP CHAR(10),
-								@SoLuongMua INT,
-								@GiaSP FLOAT)
-as
-	begin
-		if @MaCTDH is not null
-			if @MaCTDH not in (select MaCTDH from ORDER_DETAIL)
-				if (@MaDH is null or @MaDH in (select MaDH from ORDER_)) and (@MaSP is null or @MaSP in (select MaSP from PRODUCT))
-					insert into ORDER_DETAIL
-					values
-						(@MaCTDH, @MaDH, @MaSP, @SoLuongMua, @GiaSP)
-	end
-
-select * from ORDER_
-
-execute insertOrderDetail null, 'DH01', 'TS02', 4, 15000
-execute insertOrderDetail 'MCTD16', 'DH01', 'TS02', 4, 15000
-execute insertOrderDetail 'MCTD17', 'DH01', 'TS02', 4, 15000
-
-select * from ORDER_
-
--- Thủ tục trả về thông tin khách hàng mua hàng nhiều nhất trong năm 2021
-
-CREATE PROC khachHangVIP
-AS
-	BEGIN
-		select CUSTOMER.*, SoLuongMua from CUSTOMER
-		inner join (select top 1 dh.MaKH, sum(od.SoLuongMua) as "SoLuongMua" from CUSTOMER kh
-					inner join ORDER_ dh on dh.MaKH = kh.MaKH
-					inner join ORDER_DETAIL od on od.MaDH = dh.MaDH
-					where year(NgayDatHang) = '2021'
-					group by dh.MaKH
-					order by sum(od.SoLuongMua) desc) as a 
-		on CUSTOMER.MaKH = a.MaKH 
-	END
-
-execute khachHangVIP
-
+-- Thư
 -- Tạo trigger để giảm 10% tổng tiền đặt hàng nếu khách hàng đã từng mua trên 10 sản phẩm, 
 -- 20% tổng tiền đặt hàng nếu khách hàng đã từng mua trên 20 sản phẩm mỗi khi có đơn hàng mới.
 
@@ -267,6 +161,7 @@ VALUES
 
 select * from ORDER_
 
+-- Thắng
 -- Trigger ngăn không cho xoá dữ liệu bảng ORDER_DETAIL
 
 CREATE TRIGGER Trigger_check_delete_OrderDetail ON order_detail
@@ -365,6 +260,7 @@ UPDATE ORDER_DETAIL SET SoLuongMua = 10 WHERE MaCTDH = 'MCTD01'
 SELECT * FROM PRODUCT
 GO
 
+-- Thái Văn Thiện
 -- Cho sự kiện thêm mới nhiều bản ghi trên bảng order, ngày đặt phải nhỏ hơn hoặc bằng ngày hiện tại và 
 -- mã khách hàng phải có trong bảng customer.
 
